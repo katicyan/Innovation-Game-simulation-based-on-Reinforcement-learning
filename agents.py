@@ -20,7 +20,7 @@ class simulate:
     def begin(self):
         Q = np.zeros((self.env.n, self.env.num_states, self.env.num_actions))
         actions = np.zeros((self.max_steps, self.env.n))
-        memo = np.zeros((self.max_steps, self.env.n))
+        profit = np.zeros((self.max_steps, self.env.n))
         for epis in range(self.epi):
             ienv = self.env
             done = False
@@ -28,7 +28,7 @@ class simulate:
             
             incre_Q = np.zeros(Q.shape)
             incre_actions = np.zeros((self.max_steps, self.env.n), dtype=int)
-            incre_memo = np.zeros((self.max_steps, self.env.n))
+            incre_profit = np.zeros((self.max_steps, self.env.n))
             e = np.zeros((self.max_steps,self.env.n))
 
             while not done and step < self.max_steps:
@@ -51,7 +51,7 @@ class simulate:
                 # 数据收集
                 reward = ienv.session(e[step])
                 
-                incre_memo[step] = reward
+                incre_profit[step] = reward
 
                 for _ in range(self.env.n):    
                     
@@ -72,11 +72,11 @@ class simulate:
                 step += 1
 
             
-            memo = (epis/(1+epis))*memo + incre_memo/(epis+1)
+            profit = (epis/(1+epis))*profit + incre_profit/(epis+1)
             actions = (epis/(1+epis))*actions + incre_actions/(epis+1)
             Q = (epis/(1+epis))*Q + incre_Q/(epis+1)
     
-        return actions, memo, Q
+        return actions, profit, Q
         
 
 

@@ -16,12 +16,6 @@ def codetocost(s:list,c:list)->list:
     return np.array([c[_] for _ in s])
 
 
-
-
-
-
-
-
 class market:
     def __init__(self,gamma:float,n:int,demand_function,c:list,num_actions:int,k0:list,i:list,s:list):
         '''
@@ -33,6 +27,7 @@ class market:
         s technology states code\
         beta discount rate
         '''
+        
         self.k0 = k0
         self.demand_function = demand_function
         self.c = c
@@ -44,7 +39,15 @@ class market:
         self.num_states = len(c)
         self.num_actions = num_actions
         self.sc = codetocost(s,c)
-    
+
+
+        if len(self.k0) != self.n or len(i) != self.n or len(self.s) != self.n:
+            raise ValueError("Length of k0, i, and s must match the number of firms n.")
+        if self.gamma < 0 or self.gamma > 1:
+            raise ValueError("Discount factor gamma must be between 0 and 1.")
+        if self.num_actions <= 0:
+            raise ValueError("Number of actions must be a positive integer.")
+
     
         
      
@@ -79,13 +82,23 @@ class market:
         
      
         '''
-        for _ in range(len(self.s)):
+        
+        p = 0.1*np.array(self.i) / (0.1*np.array(self.i)+1)
+        # for _ in range(self.n):
+        #     print(f'company {_} has innovation input {self.i[_]} with progress prob {p[_]}')
+        
+        for _ in range(len(p)):
             
-            p = 0.1*self.i[_] / (0.1*self.i[_]+1)
-            print(f'company {_} has innovation input {self.i[_]} with progress prob {p}')
-            if dice(p) and self.s[_]<len(self.c)-1:
+            # p = 0.1*self.i[_] / (0.1*self.i[_]+1)
+            if dice(p[_]) and self.s[_]<len(self.c)-1:
                 self.s[_] += 1
                 self.i[_] = 0
+            elif self.s[_] == len(self.c)-1:
+                self.s[_] = len(self.c)-1
+                self.k[_] = self.k[_] + self.i[_]
+                self.i[_] = 0
+        
+
         return self.s
     
     
@@ -104,9 +117,11 @@ class market:
         given expansion level return what you will get
         '''
         
-        if np.array([exp > cap for exp, cap in zip(e, self.k)]).any():
-            raise ValueError("Insufficient capital")        # 当每一个状态成为成本函数的时候每一个self.c后面要进行call
-        
+        # if np.array([exp > cap for exp, cap in zip(e, self.k)]).any():
+        #     raise ValueError("Insufficient capital")        # 当每一个状态成为成本函数的时候每一个self.c后面要进行call
+        for _ in range(self.n):
+            if e[_] > self.k[_]:
+                e[_] = self.k[_]
 
 
         # i:innovation e:expansion s:state k:captial at the beginning
@@ -124,7 +139,7 @@ class market:
             else:
                 
                 q[i] = e[i] / self.sc[i]
-                print(q[i])
+            print(q[i])
         total_quantity = sum(q)        
         for i in range(self.n):        
                 cash = np.append(cash, self.demand_function(total_quantity)*q[i] - e[i])
@@ -165,7 +180,7 @@ class market:
                 self.k[i] = 0
                 self.s[i] = 0
                 self.i[i] = 0
-
+                print("company {} declares bankrupt".format(i))
         # print(self.k)
         #print('summary: ')
         #print(f'Tech:{self.s},profit: {profit}, capital: {self.k},R&D:{self.i},Expansion:{e}')

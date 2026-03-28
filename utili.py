@@ -1,6 +1,7 @@
 from scipy.optimize import minimize_scalar
 from scipy.optimize import brentq
 import numpy as np
+import matplitlib.pyplot as plt
 def maximize(g, a, b, *args):
     """
     在区
@@ -45,3 +46,7 @@ def cournot(sc,demand_function):
     y = (b-np.array(sc)) / a
     
     return cournot_matrix.I @ y
+
+
+def draw_along_time(data):
+    pass
