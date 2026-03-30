@@ -7,6 +7,11 @@ This is my coding projects for my personal undergraduate paper of economics degr
 I am a greehand of everything in coding, and hope one day I can figure all things out.
 
 This project is under constructing.
+## Some naive results
+
+![Q-table 3D animation](assets/q_table_companies_3d.gif)
+
+
 
 ## New MARL Benchmark Path (PettingZoo + RLlib)
 
