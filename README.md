@@ -9,7 +9,7 @@ I am a greehand of everything in coding, and hope one day I can figure all thing
 This project is under constructing.
 ## Some naive results
 
-![Q-table 3D animation](assets/q_table_companies_3d.gif)
+![Q-table 3D animation](./assets/q_table_companies_3d.gif)
 
 
 
