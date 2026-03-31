@@ -60,7 +60,7 @@ class market:
         '''
         x = np.asarray(innovation_input, dtype=float)
         x = np.maximum(x, 0.0)
-        k = 0.003
+        k = 0.03
         x0 = 100.0
         logits = np.clip(k * (x - x0), -60, 60)
         s = 1.0 / (1.0 + np.exp(-logits))
@@ -116,12 +116,10 @@ class market:
         Find the optimal quantity for a given expansion levelb
         '''
 
-        #constriants = np.minimum(np.ones(self.num_of_agents)*np.array(utili.zp(self.demand_function)) \
-         #                        ,utili.cournot(self.codetotech(), self.demand_function))[0] # type: ignore
+        constriants = np.minimum(np.ones(self.num_of_agents)*np.array(utili.zp(self.demand_function)) \
+                                 ,utili.cournot(self.codetotech(), self.demand_function))[0] # type: ignore
         # return [utili.maximize(self.revenue, 0, constriants[i]) for i in range(self.num_of_agents)]
-        constriants = np.ones(self.num_of_agents)* 100 / (self.codetotech()+1) # type: ignore
-
-
+        
         return np.asarray(constriants).flatten()
     
 
@@ -169,12 +167,10 @@ class market:
             outputs[i] = choices_actions[production_costs[i],i] / self.codetotech()[i]
 
         total_quantity = sum(outputs)
-        demand_fluctuation = np.random.normal(0, self.demand_function(0) * 0.01)
-        price = 100 - 100 / (np.min(self.codetotech())+1)         
+        demand_fluctuation = np.random.normal(0, self.demand_function(0) * 0.01)        
         for i in range(self.num_of_agents):        
             if self.now_capital[i] > 0:
-                #cash = np.append(cash, self.demand_function(total_quantity + demand_fluctuation)*outputs[i] - [choices_actions[production_costs[i],i]])
-                cash = np.append(cash,price*(outputs[i]+demand_fluctuation) - [choices_actions[production_costs[i],i]])
+                cash = np.append(cash, self.demand_function(total_quantity + demand_fluctuation)*outputs[i] - [choices_actions[production_costs[i],i]])
             else:
                 cash = np.append(cash, 0)
         

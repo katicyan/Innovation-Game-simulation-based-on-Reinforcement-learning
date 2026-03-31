@@ -67,7 +67,7 @@ class simulate:
 
                 for _ in range(self.env.n):    
                     if _ in bankrupt_list:
-                        reward[_] -= 1000 # 破产惩罚
+                        reward[_] -= 100000 # 破产惩罚
                     # incre_action = np.append(incre_action, actions[step])
                     
                     # 更新环境
