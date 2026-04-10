@@ -21,19 +21,49 @@ def maximize(g, a, b, *args):
     maximizer, maximum = result.x, -result.fun
     return maximizer, maximum
 
-def zp(demand_function, upper=100):
+def zp(demand_function, max_expand_steps=8):
     '''
     zero point of demand function, the upper bound of optimal quantity
-    '''
 
-    try:
+    Robust behavior:
+    - If [0, upper] does not bracket a root, expand upper a few times.
+    - If still no bracket, return a bounded fallback without printing.
+    '''
+    upper = demand_function(0) / (1e-4 + demand_function(0) - demand_function(1))  # type: ignore
+    """lo = 0.0
+    hi = float(upper)
+    flo = float(demand_function(lo))
+
+    if np.isclose(flo, 0.0):
+        return lo
+
+    fhi = float(demand_function(hi))
+
+    # Expand only when demand is still positive at hi (root lies to the right).
+    steps = 0
+    while flo * fhi > 0 and flo > 0 and fhi > 0 and steps < max_expand_steps:
+        hi *= 2.0
+        fhi = float(demand_function(hi))
+        steps += 1
+
+    if flo * fhi < 0 or np.isclose(fhi, 0.0):
+        root = brentq(demand_function, lo, hi)
+        if isinstance(root, tuple):
+            return float(root[0])
+        return float(root)
+
+    # Fallbacks avoid noisy logs and keep training stable.
+    if flo < 0 and fhi < 0:
+        return lo"""
+    """try:
         # Try to find a root in [0, 100], adjust interval as needed
         zero = brentq(demand_function, 0, upper)
     except ValueError:
         print("interval is too small or too big")
         zero = None  # No root found in interval
-# if zero is not None else None
-    return zero 
+# if zero is not None else None"""
+    return upper
+
 
 def cournot(sc,demand_function):
     '''

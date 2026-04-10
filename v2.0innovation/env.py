@@ -21,17 +21,19 @@ class market:
         beta discount rate
         '''
         
+        self.initial_capital = k0
         self.now_capital = k0
         self.demand_function = demand_function
         self.technology_level = c
         self.technology_state = s
-        self.num_agents = n
-        self.innovation_input = i
         self.gamma = gamma
+        self.innovation_input = i
+        self.num_of_agents = n
         self.num_states = len(c)
         self.num_actions = num_actions
+        self.doors = np.ones(n, dtype=int)
 
-        if len(self.now_capital) != self.num_agents or len(self.innovation_input) != self.num_agents or len(self.technology_state) != self.num_agents:
+        if len(self.initial_capital) != self.num_of_agents or len(self.innovation_input) != self.num_of_agents or len(self.technology_state) != self.num_of_agents:
             raise ValueError("Length of initial_capital, innovation_input, and technology_state must match the number of firms.")
         if self.gamma < 0 or self.gamma > 1:
             raise ValueError("Discount factor gamma must be between 0 and 1.")
@@ -39,8 +41,8 @@ class market:
             raise ValueError("Number of actions must be a positive integer.")
 
     def info(self):
-        print(f'number of firms: {self.num_agents}')
-        print(f'initial capital: {self.now_capital}')
+        print(f'number of firms: {self.num_of_agents}')
+        print(f'initial capital: {self.initial_capital}')
         print(f'initial technology level: {self.technology_level}')
         print(f'initial technology state: {self.technology_state}')
         print(f'initial innovation input: {self.innovation_input}')
@@ -58,7 +60,7 @@ class market:
         '''
         x = np.asarray(innovation_input, dtype=float)
         x = np.maximum(x, 0.0)
-        k = 0.003
+        k = 0.03
         x0 = 100.0
         logits = np.clip(k * (x - x0), -60, 60)
         s = 1.0 / (1.0 + np.exp(-logits))
@@ -107,19 +109,17 @@ class market:
 
         give mono's output return revenue
         '''
-        return [self.demand_function(sum(q))*q[i] - self.codetotech()[i]*q[i] for i in range(self.num_agents)]
+        return [self.demand_function(sum(q))*q[i] - self.codetotech()[i]*q[i] for i in range(self.num_of_agents)]
     
     def optimal(self):
         '''
         Find the optimal quantity for a given expansion levelb
         '''
 
-        constriants = np.minimum(np.ones(self.num_agents)*np.array(utili.zp(self.demand_function))
-                                ,utili.cournot(self.codetotech(), self.demand_function))[0] # type: ignore
-        # return [utili.maximize(self.revenue, 0, constriants[i]) for i in range(self.num_agents)]
-        #constriants = np.ones(self.num_agents)* 100 / (self.codetotech()+1) # type: ignore
-
-
+        constriants = np.minimum(np.ones(self.num_of_agents)*np.array(utili.zp(self.demand_function)) \
+                                 ,utili.cournot(self.codetotech(), self.demand_function))[0] # type: ignore
+        # return [utili.maximize(self.revenue, 0, constriants[i]) for i in range(self.num_of_agents)]
+        
         return np.asarray(constriants).flatten()
     
 
@@ -158,21 +158,19 @@ class market:
             #     production_costs[i] = limits[1][i]
             # else:
         # limits = self.input_limit()          
-        outputs = np.zeros(self.num_agents) # quantity list
+        outputs = np.zeros(self.num_of_agents) # quantity list
         cash = np.array([]) # profit list
-        for i in range(self.num_agents):
+        for i in range(self.num_of_agents):
             # print(choices_actions)
             # print(production_costs[i])
             # print(choices_actions[production_costs[i],i])
             outputs[i] = choices_actions[production_costs[i],i] / self.codetotech()[i]
 
         total_quantity = sum(outputs)
-        demand_fluctuation = np.random.normal(0, self.demand_function(0) * 0.01)
-        price = 100 - 100 / (np.min(self.codetotech())+1)         
-        for i in range(self.num_agents):        
+        demand_fluctuation = np.random.normal(0, self.demand_function(0) * 0.01)        
+        for i in range(self.num_of_agents):        
             if self.now_capital[i] > 0:
-                #cash = np.append(cash, self.demand_function(total_quantity + demand_fluctuation)*outputs[i] - [choices_actions[production_costs[i],i]])
-                cash = np.append(cash,price*(outputs[i]+demand_fluctuation) - [choices_actions[production_costs[i],i]])
+                cash = np.append(cash, self.demand_function(total_quantity + demand_fluctuation)*outputs[i] - [choices_actions[production_costs[i],i]])
             else:
                 cash = np.append(cash, 0)
         
@@ -181,7 +179,7 @@ class market:
 
 
     def update(self,cash,incre_action,actions_costs):
-        for j in range(self.num_agents):
+        for j in range(self.num_of_agents):
             
             if incre_action[j] == -1:
                 continue
