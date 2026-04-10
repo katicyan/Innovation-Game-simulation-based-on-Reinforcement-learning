@@ -26,12 +26,12 @@ class market:
         self.demand_function = demand_function
         self.technology_level = c
         self.technology_state = s
-        self.num_of_agents = n
-        self.innovation_input = i
         self.gamma = gamma
+        self.innovation_input = i
+        self.num_of_agents = n
         self.num_states = len(c)
         self.num_actions = num_actions
-        
+        self.doors = np.ones(n, dtype=int)
 
         if len(self.initial_capital) != self.num_of_agents or len(self.innovation_input) != self.num_of_agents or len(self.technology_state) != self.num_of_agents:
             raise ValueError("Length of initial_capital, innovation_input, and technology_state must match the number of firms.")
