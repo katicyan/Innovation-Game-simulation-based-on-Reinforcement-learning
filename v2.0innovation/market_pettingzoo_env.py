@@ -130,8 +130,9 @@ class MarketParallelEnv(ParallelEnv):
             return {}, {}, {}, {}, {}
 
         self._step_count += 1
+        # print("entering step", self._step_count)
         self._env.update_tech()
-        
+        # print("end technology update")
         # B3
         action_indices = np.zeros(self._n, dtype=int)
         for agent in self.agents:
@@ -194,13 +195,21 @@ class MarketParallelEnv(ParallelEnv):
     def render(self):
         capital = np.asarray(self._env.now_capital, dtype=float)
         tech = np.asarray(self._env.technology_state, dtype=int)
+        innovation_input = np.asarray(self._env.innovation_input, dtype=float)
         print(
             "step=", self._step_count,
-            "capital=", capital.round(2),
             "tech=", tech,
+            "capital=", capital.round(2),
+            "innovation_input=", innovation_input.round(2),
             "outputs=", self._last_outputs.round(4),
         )
 
+    def get_state(self):
+        capital = np.asarray(self._env.now_capital, dtype=float)
+        tech = np.asarray(self._env.technology_state, dtype=int)
+        innovation_input = np.asarray(self._env.innovation_input, dtype=float)
+        return capital, tech, innovation_input
+    
     def close(self):
         return
 

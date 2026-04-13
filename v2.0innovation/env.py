@@ -42,11 +42,11 @@ class market:
 
     def info(self):
         print(f'number of firms: {self.num_of_agents}')
-        print(f'initial capital: {self.initial_capital}')
-        print(f'initial technology level: {self.technology_level}')
-        print(f'initial technology state: {self.technology_state}')
-        print(f'initial innovation input: {self.innovation_input}')
-        print(f'discount factor: {self.gamma}')
+        print(f'current capital: {self.now_capital}')
+        # print(f'initial technology level: {self.technology_level}')
+        print(f'current technology state: {self.technology_state}')
+        print(f'current innovation input: {self.innovation_input}')
+        # print(f'discount factor: {self.gamma}')
 
     def innovation_to_probability(self, innovation_input):
         '''
@@ -61,7 +61,7 @@ class market:
         x = np.asarray(innovation_input, dtype=float)
         x = np.maximum(x, 0.0)
         k = 0.03
-        x0 = 100.0
+        x0 = 10000.0
         logits = np.clip(k * (x - x0), -60, 60)
         s = 1.0 / (1.0 + np.exp(-logits))
 
@@ -82,8 +82,11 @@ class market:
         
      
         '''
-        
+        # print("updating technology states...")
         p = self.innovation_to_probability(self.innovation_input)
+        # print(f'innovation input: {self.innovation_input}, progress prob: {p}, tech state: {self.technology_state}')
+
+        
         # for _ in range(self.n):
         #     print(f'company {_} has innovation input {self.innovation_input[_]} with progress prob {p[_]}')
         # print(f'innovation input: {self.innovation_input}, progress prob: {p}')
