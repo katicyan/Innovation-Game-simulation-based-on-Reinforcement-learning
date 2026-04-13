@@ -80,8 +80,9 @@ class market:
         
      
         '''
-        
+        # print("updating technology states...")
         p = self.innovation_to_probability(self.innovation_input)
+        # print(f'innovation input: {self.innovation_input}, progress prob: {p}, tech state: {self.technology_state}')
         # for _ in range(self.n):
         #     print(f'company {_} has innovation input {self.innovation_input[_]} with progress prob {p[_]}')
         # print(f'innovation input: {self.innovation_input}, progress prob: {p}')
@@ -96,7 +97,7 @@ class market:
                 # print(f'company {_} has reached the maximum technology state {self.technology_state[_]} with innovation input {self.innovation_input[_]}')
                 self.now_capital[_] = self.now_capital[_] + self.innovation_input[_]
                 self.innovation_input[_] = 0
-            
+        print("flag")
         return self.technology_state
     
         
