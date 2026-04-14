@@ -1,0 +1,4 @@
+python ../test_saved_qnet.py --model-path ./v2.0innovation/experiment_data/e001_trained_models --n-agents 10 --seed 0 --output-dir ./v2.0innovation/test_data/e001_test_results    
+python ../test_saved_qnet.py --model-path ./v2.0innovation/experiment_data/e002_trained_models --n-agents 10 --seed 0 --initial-capital [100,50,50,50,50,50,50,50,50,50] --output-dir ./v2.0innovation/test_data/e002_test_results
+python ../test_saved_qnet.py --model-path ./v2.0innovation/experiment_data/e003_trained_models --n-agents 10 --seed 0 --initial-technology [3,0,0,0,0,0,0,0,0,0] --output-dir ./v2.0innovation/test_data/e003_test_results
+python ../test_saved_qnet.py --model-path ./v2.0innovation/experiment_data/e004_trained_models --n-agents 10 --seed 0 --tech-levels [80,40,20,10,5,1] --output-dir ./v2.0innovation/test_data/e004_test_results

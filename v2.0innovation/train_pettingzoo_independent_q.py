@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Deque, Dict, List
 import pandas as pd
+from tqdm.auto import tqdm
 
 import numpy as np
 import torch
@@ -13,6 +14,9 @@ import torch.optim as optim
 
 import env as market_env
 from market_pettingzoo_env import parallel_env
+
+def parse_list(value):
+    return [float(x.strip()) for x in value.strip("[]").split(",") if x.strip()]
 
 def dict_save_as_csv(data: Dict[str, List], output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -40,25 +44,6 @@ def make_linear_demand(intercept: float, slope: float):
 def epsilon_decay(step: int, total_steps: int, eps_start: float, eps_end: float) -> float:
     ratio = step / max(total_steps, 1)
     return max(eps_end, eps_start * (1.0 - ratio))
-
-
-def print_training_progress(
-    current_episode: int,
-    total_episodes: int,
-    mean_reward: float,
-    mean_loss: float,
-    epsilon: float,
-    width: int = 30,
-) -> None:
-    ratio = current_episode / max(total_episodes, 1)
-    filled = int(width * ratio)
-    bar = "#" * filled + "-" * (width - filled)
-    print(
-        f"\rTraining [{bar}] {current_episode}/{total_episodes} "
-        f"reward={mean_reward:.3f} loss={mean_loss:.5f} eps={epsilon:.4f}",
-        end="",
-        flush=True,
-    )
 
 
 class QNetwork(nn.Module):
@@ -173,9 +158,9 @@ class IndependentDQNAgent:
         self.target_net.load_state_dict(self.q_net.state_dict())
 
 
-def export_qnetwork_parameters(agents: Dict[str, IndependentDQNAgent], output_dir: Path) -> None:
-    model_dir = output_dir / "trained_models"
-    report_dir = output_dir / "model_parameters"
+def export_qnetwork_parameters(agents: Dict[str, IndependentDQNAgent], output_dir: Path, args) -> None:
+    model_dir = output_dir / f"{args.output_file}_trained_models"
+    report_dir = output_dir / f"{args.output_file}_model_parameters"
     model_dir.mkdir(parents=True, exist_ok=True)
     report_dir.mkdir(parents=True, exist_ok=True)
 
@@ -205,18 +190,34 @@ def train(args):
     torch.manual_seed(args.seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(args.seed)
-
+    # print(args.initial_capital)
+    # print(type(args.initial_capital))
     demand_fn = make_linear_demand(args.demand_intercept, args.demand_slope)
+    
+    try:
+        c_buffer = [float(x) for x in args.tech_levels]
+    except Exception as e:
+        c_buffer = [float(x) for x in args.tech_levels[0]]
+    try:
+        k0_buffer = [float(x) for x in args.initial_capital]
+    except Exception as e:
+        k0_buffer = [float(x) for x in args.initial_capital[0]] 
+    try:
+        s_buffer = [int(x) for x in args.initial_technology]
+    except Exception as e:
+        s_buffer = [int(x) for x in args.initial_technology[0]]
+
+
 
     base_market = market_env.market(
         gamma=args.gamma,
         n=args.n_agents,
         demand_function=demand_fn,
-        c=[float(x) for x in args.tech_levels],
+        c=c_buffer,
         num_actions=args.num_actions,
-        k0=[float(x) for x in args.initial_capital],
+        k0=k0_buffer,
         i=[0.0] * args.n_agents,
-        s=[0] * args.n_agents,
+        s=s_buffer,
     )
 
     env = parallel_env(base_market, max_steps=args.max_steps, bankrupt_penalty=args.bankrupt_penalty)
@@ -248,80 +249,80 @@ def train(args):
     balance_log_capital = []
     balance_log_tech = []
     balance_log_innovation_input = []
-    for episode in range(args.episodes):
-        observations, infos = env.reset(seed=args.seed + episode)
-        total_reward = {agent: 0.0 for agent in env.possible_agents}
-        total_loss = {agent: 0.0 for agent in env.possible_agents}
-        loss_updates = {agent: 0 for agent in env.possible_agents}
-        q_table = {agent: np.ones((1, args.num_actions), dtype=np.float32) * 1e-4 for agent in env.possible_agents}
-        # print("P1 Env info")
-        # env._env.info()
-        while env.agents:
-            actions = {}
-            for agent in env.agents:
-                eps = epsilon_decay(global_step, args.eps_decay_steps, args.eps_start, args.eps_end)
-                actions[agent], q_table[agent] = agents[agent].act(observations[agent], eps)
-                action_history[agent].append(actions[agent])
-            # print(f"P{episode}{env._step_count} Env info before step")
+    with tqdm(total=args.episodes, desc="Training", unit="episode") as pbar:
+        for episode in range(args.episodes):
+            observations, infos = env.reset(seed=args.seed + episode)
+            total_reward = {agent: 0.0 for agent in env.possible_agents}
+            total_loss = {agent: 0.0 for agent in env.possible_agents}
+            loss_updates = {agent: 0 for agent in env.possible_agents}
+            q_table = {agent: np.ones((1, args.num_actions), dtype=np.float32) * 1e-4 for agent in env.possible_agents}
+            # print("P1 Env info")
             # env._env.info()
-            next_obs, rewards, terminations, truncations, infos = env.step(actions)
-            capital, tech, innovation_input = env.get_state()
-            balance_log_capital.append(capital)
-            balance_log_tech.append(tech)
-            balance_log_innovation_input.append(innovation_input)
+            while env.agents:
+                actions = {}
+                for agent in env.agents:
+                    eps = epsilon_decay(global_step, args.eps_decay_steps, args.eps_start, args.eps_end)
+                    actions[agent], q_table[agent] = agents[agent].act(observations[agent], eps)
+                    action_history[agent].append(actions[agent])
+                # print(f"P{episode}{env._step_count} Env info before step")
+                # env._env.info()
+                next_obs, rewards, terminations, truncations, infos = env.step(actions)
+                capital, tech, innovation_input = env.get_state()
+                balance_log_capital.append(capital)
+                balance_log_tech.append(tech)
+                balance_log_innovation_input.append(innovation_input)
 
-            for agent, reward in rewards.items():
-                action = int(actions[agent])
-                done = bool(terminations[agent] or truncations[agent])
-                
-                revenue_history[agent].append(rewards[agent])
+                for agent, reward in rewards.items():
+                    action = int(actions[agent])
+                    done = bool(terminations[agent] or truncations[agent])
 
-                if done:
-                    fallback_next_obs = np.zeros_like(observations[agent], dtype=np.float32)
-                    agent_next_obs = next_obs.get(agent, fallback_next_obs)
-                else:
-                    agent_next_obs = next_obs[agent]
+                    revenue_history[agent].append(rewards[agent])
 
-                agents[agent].store(
-                    obs=observations[agent],
-                    action=action,
-                    reward=float(reward),
-                    next_obs=agent_next_obs,
-                    done=done,
-                )
-                loss = agents[agent].update()
-                if loss > 0:
-                    total_loss[agent] += loss
-                    loss_updates[agent] += 1
+                    if done:
+                        fallback_next_obs = np.zeros_like(observations[agent], dtype=np.float32)
+                        agent_next_obs = next_obs.get(agent, fallback_next_obs)
+                    else:
+                        agent_next_obs = next_obs[agent]
 
-                total_reward[agent] += float(reward)
+                    agents[agent].store(
+                        obs=observations[agent],
+                        action=action,
+                        reward=float(reward),
+                        next_obs=agent_next_obs,
+                        done=done,
+                    )
+                    loss = agents[agent].update()
+                    if loss > 0:
+                        total_loss[agent] += loss
+                        loss_updates[agent] += 1
 
-            observations = next_obs
-            global_step += 1
+                    total_reward[agent] += float(reward)
 
-            if global_step % args.target_update_interval == 0:
-                for dqn_agent in agents.values():
-                    dqn_agent.sync_target()
+                observations = next_obs
+                global_step += 1
 
-        mean_reward = float(np.mean(list(total_reward.values())))
-        episode_rewards.append(mean_reward)
-        mean_loss_vals = [
-            (total_loss[a] / loss_updates[a]) if loss_updates[a] > 0 else 0.0
-            for a in env.possible_agents
-        ]
-        mean_loss = float(np.mean(mean_loss_vals))
+                if global_step % args.target_update_interval == 0:
+                    for dqn_agent in agents.values():
+                        dqn_agent.sync_target()
 
-        if (episode + 1) % args.log_every == 0:
-            print(
-                f"Episode {episode + 1}: mean reward={mean_reward:.3f}, "
-                f"mean loss={mean_loss:.5f}, epsilon={epsilon_decay(global_step, args.eps_decay_steps, args.eps_start, args.eps_end):.4f}"
+            mean_reward = float(np.mean(list(total_reward.values())))
+            episode_rewards.append(mean_reward)
+            mean_loss_vals = [
+                (total_loss[a] / loss_updates[a]) if loss_updates[a] > 0 else 0.0
+                for a in env.possible_agents
+            ]
+            mean_loss = float(np.mean(mean_loss_vals))
+
+            current_eps = epsilon_decay(global_step, args.eps_decay_steps, args.eps_start, args.eps_end)
+            pbar.set_postfix(
+                reward=f"{mean_reward:.3f}",
+                loss=f"{mean_loss:.5f}",
+                eps=f"{current_eps:.4f}",
             )
+            pbar.update(1)
 
-        current_eps = epsilon_decay(global_step, args.eps_decay_steps, args.eps_start, args.eps_end)
-        print_training_progress(episode + 1, args.episodes, mean_reward, mean_loss, current_eps)
-        
-        action_q_matrix = np.vstack([q_table[a].reshape(1, -1) for a in env.possible_agents])
-        Q.append(action_q_matrix)
+            action_q_matrix = np.vstack([q_table[a].reshape(1, -1) for a in env.possible_agents])
+            Q.append(action_q_matrix)
     # C8
     cols = ",".join([f"action_{i}" for i in range(args.num_actions)])
     output_dir = Path(args.output_dir)
@@ -336,18 +337,16 @@ def train(args):
         comments="",
         fmt="%.6f"
     )
-    print(f"Saved Q-values to: {output_path}")
+    # print(f"Saved Q-values to: {output_path}")
     # np.savez(output_dir / "revenue_history.npz", **revenue_history)
     # np.savez(output_dir / "action_history.npz", **action_history)
-    dict_save_as_csv(revenue_history, output_dir / "revenue_history.csv")
-    dict_save_as_csv(action_history, output_dir / "action_history.csv")
-    list_save_as_csv(balance_log_capital, output_dir / "balance_log_capital.csv")
-    list_save_as_csv(balance_log_tech, output_dir / "balance_log_tech.csv")
-    list_save_as_csv(balance_log_innovation_input, output_dir / "balance_log_innovation_input.csv")
+    dict_save_as_csv(revenue_history, output_dir / f"{args.output_file}_revenue_history.csv")
+    dict_save_as_csv(action_history, output_dir / f"{args.output_file}_action_history.csv")
+    list_save_as_csv(balance_log_capital, output_dir / f"{args.output_file}_balance_log_capital.csv")
+    list_save_as_csv(balance_log_tech, output_dir / f"{args.output_file}_balance_log_tech.csv")
+    list_save_as_csv(balance_log_innovation_input, output_dir / f"{args.output_file}_balance_log_innovation_input.csv")
 
-    export_qnetwork_parameters(agents, output_dir)
-
-    print()
+    export_qnetwork_parameters(agents, output_dir, args)
 
 
     env.close()
@@ -501,7 +500,7 @@ def test(args):
     list_save_as_csv(balance_log_tech, output_dir / "balance_log_tech.csv")
     list_save_as_csv(balance_log_innovation_input, output_dir / "balance_log_innovation_input.csv")
 
-    export_qnetwork_parameters(agents, output_dir)
+    export_qnetwork_parameters(agents, output_dir, args)
 
 
     env.close()
@@ -533,8 +532,9 @@ if __name__ == "__main__":
     parser.add_argument("--max-steps", type=int, default=200)
     parser.add_argument("--n-agents", type=int, default=5)
     parser.add_argument("--num-actions", type=int, default=10)
-    parser.add_argument("--tech-levels", type=float, nargs="+", default=[20.0, 10.0, 5.0, 1.0])
-    parser.add_argument("--initial-capital", type=float, nargs="+", default=[50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0])
+    parser.add_argument("--tech-levels", type=parse_list, nargs="+", default=[20.0, 10.0, 5.0, 1.0])
+    parser.add_argument("--initial-capital", type=parse_list, nargs="+", default=[50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0])
+    parser.add_argument("--initial-technology", type=parse_list, nargs="+", default=[0.0] * 10)
     parser.add_argument("--gamma", type=float, default=0.95)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--hidden-dim", type=int, default=128)
@@ -551,6 +551,6 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", type=str, default="")
     parser.add_argument("--output-dir", type=str, default="./v2.0innovation/experiment_data")
-    parser.add_argument("--output-file", type=str, default="e0001_Q_values.csv")
+    parser.add_argument("--output-file", type=str, default="e0001")
 
     train(parser.parse_args())

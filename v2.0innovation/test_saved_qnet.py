@@ -2,6 +2,7 @@ import argparse
 import random
 from pathlib import Path
 from typing import Dict
+from tqdm.auto import tqdm
 
 import numpy as np
 import torch
@@ -10,6 +11,10 @@ import torch.nn as nn
 import env as market_env
 from market_pettingzoo_env import parallel_env
 from train_pettingzoo_independent_q import dict_save_as_csv, IndependentDQNAgent, list_save_as_csv
+
+def parse_list(value):
+    return [float(x.strip()) for x in value.strip("[]").split(",") if x.strip()]
+
 
 class QNetwork(nn.Module):
     def __init__(self, obs_dim: int, num_actions: int, hidden_dim: int) -> None:
@@ -38,15 +43,30 @@ def make_linear_demand(intercept: float, slope: float):
 
 def build_env(args):
     demand_fn = make_linear_demand(args.demand_intercept, args.demand_slope)
+    
+    try:
+        c_buffer = [float(x) for x in args.tech_levels]
+    except Exception as e:
+        c_buffer = [float(x) for x in args.tech_levels[0]]
+    try:
+        k0_buffer = [float(x) for x in args.initial_capital]
+    except Exception as e:
+        k0_buffer = [float(x) for x in args.initial_capital[0]] 
+    try:
+        s_buffer = [int(x) for x in args.initial_technology]
+    except Exception as e:
+        s_buffer = [int(x) for x in args.initial_technology[0]]
+
+    
     base_market = market_env.market(
         gamma=args.gamma,
         n=args.n_agents,
         demand_function=demand_fn,
-        c=[float(x) for x in args.tech_levels],
+        c=c_buffer,
         num_actions=args.num_actions,
-        k0=[float(x) for x in args.initial_capital],
+        k0=k0_buffer,
         i=[0.0] * args.n_agents,
-        s=[0] * args.n_agents,
+        s=s_buffer,
     )
     return parallel_env(base_market, max_steps=args.max_steps, bankrupt_penalty=args.bankrupt_penalty)
 
@@ -108,56 +128,57 @@ def run_test(args):
     balance_log_capital = []
     balance_log_tech = []
     balance_log_innovation_input = []
-    for ep in range(args.episodes):
-        observations, _ = env.reset(seed=args.seed + ep)
-        ep_reward = 0.0
-        total_reward = {agent: 0.0 for agent in env.possible_agents}
+    with tqdm(total=args.episodes, desc="Training", unit="episode") as pbar:
+        for ep in range(args.episodes):
+            observations, _ = env.reset(seed=args.seed + ep)
+            ep_reward = 0.0
+            total_reward = {agent: 0.0 for agent in env.possible_agents}
 
-        while env.agents:
-            actions = {}
-            for agent in env.agents:
-                if agent in agents:
-                    action, q_values = select_greedy_action(agents[agent], observations[agent], device)
-                    actions[agent] = action
-                    if (agent == args.agent_name) and (not first_step_logged):
-                        print(f"First-step Q-values for {agent}: {q_values.flatten()}")
-                        print(f"First-step greedy action for {agent}: {action}")
-                        first_step_logged = True
-                else:
-                    actions[agent] = int(np.random.randint(0, args.num_actions))
-                action_history[agent].append(actions[agent])
+            while env.agents:
+                actions = {}
+                for agent in env.agents:
+                    if agent in agents:
+                        action, q_values = select_greedy_action(agents[agent], observations[agent], device)
+                        actions[agent] = action
+                        if (agent == args.agent_name) and (not first_step_logged):
+                            print(f"First-step Q-values for {agent}: {q_values.flatten()}")
+                            print(f"First-step greedy action for {agent}: {action}")
+                            first_step_logged = True
+                    else:
+                        actions[agent] = int(np.random.randint(0, args.num_actions))
+                    action_history[agent].append(actions[agent])
 
-            next_obs, rewards, terminations, truncations, _ = env.step(actions)
-            capital, tech, innovation_input = env.get_state()
-            balance_log_capital.append(capital)
-            balance_log_tech.append(tech)
-            balance_log_innovation_input.append(innovation_input)
+                next_obs, rewards, terminations, truncations, _ = env.step(actions)
+                capital, tech, innovation_input = env.get_state()
+                balance_log_capital.append(capital)
+                balance_log_tech.append(tech)
+                balance_log_innovation_input.append(innovation_input)
 
-            for agent, reward in rewards.items():
-                action = int(actions[agent])
-                done = bool(terminations[agent] or truncations[agent])
+                for agent, reward in rewards.items():
+                    action = int(actions[agent])
+                    done = bool(terminations[agent] or truncations[agent])
+                    
+                    revenue_history[agent].append(rewards[agent])
+
+                    if done:
+                        fallback_next_obs = np.zeros_like(observations[agent], dtype=np.float32)
+                        agent_next_obs = next_obs.get(agent, fallback_next_obs)
+                    else:
+                        agent_next_obs = next_obs[agent]
+
+
+                    total_reward[agent] += float(reward)
                 
-                revenue_history[agent].append(rewards[agent])
-
-                if done:
-                    fallback_next_obs = np.zeros_like(observations[agent], dtype=np.float32)
-                    agent_next_obs = next_obs.get(agent, fallback_next_obs)
-                else:
-                    agent_next_obs = next_obs[agent]
 
 
-                total_reward[agent] += float(reward)
-            
+                observations = next_obs
 
+                done = terminations.get(args.agent_name, False) or truncations.get(args.agent_name, False)
+                if done and args.agent_name not in env.agents:
+                    pass
 
-            observations = next_obs
-
-            done = terminations.get(args.agent_name, False) or truncations.get(args.agent_name, False)
-            if done and args.agent_name not in env.agents:
-                pass
-
-        episode_rewards.append(ep_reward)
-        print(f"Episode {ep + 1}: reward({args.agent_name}) = {ep_reward:.4f}")
+            episode_rewards.append(ep_reward)
+            print(f"Episode {ep + 1}: reward({args.agent_name}) = {ep_reward:.4f}")
 
     env.close()
 
@@ -196,8 +217,9 @@ if __name__ == "__main__":
     parser.add_argument("--n-agents", type=int, default=5)
     parser.add_argument("--num-actions", type=int, default=10)
     parser.add_argument("--hidden-dim", type=int, default=128)
-    parser.add_argument("--tech-levels", type=float, nargs="+", default=[20.0, 10.0, 5.0, 1.0])
-    parser.add_argument("--initial-capital", type=float, nargs="+", default=[50.0, 50.0, 50.0, 50.0, 50.0,50.0, 50.0, 50.0, 50.0, 50.0])
+    parser.add_argument("--tech-levels", type=parse_list, nargs="+", default=[20.0, 10.0, 5.0, 1.0])
+    parser.add_argument("--initial-capital", type=parse_list, nargs="+", default=[50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0])
+    parser.add_argument("--initial-technology", type=parse_list, nargs="+", default=[0.0] * 10)
     parser.add_argument("--gamma", type=float, default=0.95)
     parser.add_argument("--bankrupt-penalty", type=float, default=100000.0)
     parser.add_argument("--demand-intercept", type=float, default=200.0)
