@@ -23,8 +23,6 @@ This repository now includes a true multi-agent environment and baseline benchma
 
 - `market_core.py`: pure transition helpers extracted from the legacy environment logic
 - `market_marl_env.py`: PettingZoo `ParallelEnv` implementation (`MarketParallelEnv`)
-- `reinforcement/access_from_paper/v0.1_producer/executables/train_rllib_ppo.py`: PPO training entrypoint
-- `reinforcement/access_from_paper/v0.1_producer/executables/eval_policy.py`: checkpoint evaluation entrypoint
 - `tests/test_market_core.py` and `tests/test_market_marl_env.py`: smoke tests
 
 ### Install dependencies
@@ -34,21 +32,7 @@ python -m pip install --upgrade pip
 python -m pip install gymnasium pettingzoo ray[rllib] numpy scipy pytest
 ```
 
-### Run tests
-
-```bash
-pytest -q
-```
-
-### Train PPO baseline
+### Train DQN agents
 
 Please run the bash lines in the v2.0innovation by using train bash file first and use test bash file to collect test data, at last, use plot bash to draw the results of tests.
 
-### Evaluate a checkpoint
-
-```bash
-python reinforcement/access_from_paper/v0.1_producer/executables/eval_policy.py \
-	--checkpoint <path_to_checkpoint> \
-	--episodes 20 \
-	--seed 42
-```
