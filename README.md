@@ -7,6 +7,8 @@ This is my coding projects for my personal undergraduate paper of economics degr
 I am a greehand of everything in coding, and hope one day I can figure all things out.
 
 This project is under constructing.
+
+**For newest or last work I have done, please check the v2.0innovation directory directly, and ignore other files**.
 ## Some naive results
 
 ![Q-table 3D animation](./assets/q_table_companies_3d.gif)
@@ -40,12 +42,7 @@ pytest -q
 
 ### Train PPO baseline
 
-```bash
-python reinforcement/access_from_paper/v0.1_producer/executables/train_rllib_ppo.py \
-	--stop-timesteps 5000 \
-	--seed 42 \
-	--num-workers 1
-```
+Please run the bash lines in the v2.0innovation by using train bash file first and use test bash file to collect test data, at last, use plot bash to draw the results of tests.
 
 ### Evaluate a checkpoint
 
